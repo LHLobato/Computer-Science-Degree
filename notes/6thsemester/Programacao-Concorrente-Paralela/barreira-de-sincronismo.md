@@ -27,7 +27,7 @@ process Worker[i=1 to N]{
 	while(true){
 		funcao();
 		arrive[i] = 1;
-		while (continue[i] == 0) skip;
+		while (continue[i] == 1) skip;
 		continue[i] = 0;
         //<await(continue[i]==1) continue[i]=0;>
 	}
@@ -87,19 +87,71 @@ O nó raiz, como não tem pai, foca o arrive dos filhos, de modo a esperar os fi
 
 O nó interno espera o arrive de seus filhos, igual a raiz, sinaliza o seu próprio arrive para o nó pai dele, e espera o pai sinalizar que ele pode continuar, e reseta o seu próprio continue, e propaga para os filhos que eles podem continuar. 
 
-### Solução de barreiras com Simetria
+### Solução de barreiras com Simetria (melhor para distributed systems)
+São barreiras implementadas com o foco em multiprocessos com memória compartilhada e tempo de acesso à memória não uniforme. O melhor jeito de deixar um processo com o conhecimento de que todos os outros chegaram é através de uma interconexão binária, de modo que deve-se respeitar $log_2 n$. Deve ser uma potência de base 2 o número de processos.
+Código básico de barreira de simetria entre dois processos:
+
+```C
+//Barrir code for worker process W[i]
+<await (arrive[i] == 0);> 
+arrive[i] = 1;
+<await (arrive[j] ==1);>
+arrive[j] = 0;
+
+//Barrir code for worker process W[j]
+<await (arrive[j] == 0);> 
+arrive[j] = 1;
+<await (arrive[i] ==1);>
+arrive[i] = 0;
+```
+
 
 Existem duas barreiras por simetria, dentre elas:
 
 ## Barreia Borboleta
 
-Esta barreira funciona apenas quando o número de processos é 2<sup>N</sup>, visto que cada processo se comunica com o seu vizinho, alterando ao longo das etapas. A comunicação entre eles é feita através de código gray. **(LER NO LIVRO)**
+Esta barreira funciona apenas quando o número de processos é 2<sup>N</sup>, visto que cada processo se comunica com o seu vizinho, alterando ao longo das etapas. A comunicação entre eles é feita através de código gray. 
+
+Para esta barreira, em cada estágio S, um processo Worker comunica-se com um processo há uma distância 2<sup>s-1</sup>. O número de estágios S é definido por $log_2 n$. Quando N não é potência de 2, pode-se simular adicionando um "worker vazio". Ineficiente.
+
+```
+process Worker[i = 0 to N-1] {
+    // Inicializa o sentido local
+    sentido = 1; 
+
+    while(true) {
+        // ... trabalho ...
+
+        // Inicia a barreira
+        for (s = 0 to log2(N)-1) {
+			j = para_quem_envia(i, s); // borboleta ou disseminação
+
+            // 1. Sinaliza para o parceiro nesta rodada e estágio
+            flags[j][sentido][s] = 1;
+
+            // 2. Espera pelo sinal do parceiro
+            < await (flags[i][sentido][s] == 1) >;
+        }
+
+        // Inverte o sentido para a próxima vez que usar a barreira
+        sentido = 1 - sentido;
+
+        // ... pode prosseguir ...
+    }
+}
+
+```
 Segue exemplo:
 ![alt text](images/image-4.png)
 
 
 ### Barreira por Disseminação
-Código de implementação:
+Segue-se os mesmos princípios de distância, porém cada par de processos um processo seta  flag de arrive da sua direita, espera e depois limpa a sua própria flag. 
+Um dos maiores desafios é adaptar o tipo de interconexão entre os processos para evitar condições de disputa que podem originar a partir das múltiplas instâncias da barreira básica entre dois processos.
+
+No código abaixo o vetor de arrive é utilizado como um contador de estágios, de modo que agora o worker[i] espera que o vizinho J do estágio arrive[i] onde ele se encontra esteja pelo menos no mesmo estágio que ele, corrigindo qualquer problema onde o processo J pode também ultrapassar a barreira.
+
+Deste modo, eliminam-se os problemas de um processo ter que esperar sua própria flag de ser resetada, e nem ter que resetar a flag de outros processos.
 
 ```C
 BARREIRA:
