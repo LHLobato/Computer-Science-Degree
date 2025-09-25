@@ -79,7 +79,7 @@ body
             // atualiza o relogio 
             tod = tod + 1
             P(m);
-            while (tod <= napQueue.top().waketime) {
+            while (tod <= napQueue.top().waketime){ //tod for maior ou igual ao menor waketime da fila. 
                 napQueue.pop()
                 V(d[id]);
             }
@@ -91,3 +91,5 @@ end TimeServer
 ```
 
 **LER NO LIVRO**
+
+Mídia pra caralho pô, de rocha zé, tipo tem a napQueue que são os processos a serem acordados. O get_time só retorna o tempo mesmo,  o delay coloca o processo a ser delayzado para dormir, inserindo-o na napQueue, armazenando a hora de acordar através de tod + interval. Assim, o processo relógio incrementa normalmente a hora do dia, e com exclusão mútua na napQueue, enquando o waketime do topo da fila for maior ou igual a time of day, ele vai liberando os processos. Parece mais uma pilha do que uma queue mas blz.
